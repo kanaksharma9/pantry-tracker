@@ -1,8 +1,7 @@
-"use client"
-
-import { useState, useEffect, useRef } from 'react';
+'use client'
+import { useState, useEffect } from 'react';
 import { Box, Stack, Typography, Button, Modal, TextField } from '@mui/material';
-import { firestore, storage } from '@/firebase';
+import { firestore } from '@/firebase';
 import {
   collection,
   doc,
@@ -12,9 +11,6 @@ import {
   deleteDoc,
   getDoc,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import Webcam from 'react-webcam';
-import Image from 'next/image'; 
 import React from 'react';
 
 const modalStyle = {
@@ -48,10 +44,8 @@ const imgStyle = {
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
-  const [cameraOpen, setCameraOpen] = useState(false);
   const [itemName, setItemName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [imageSrc, setImageSrc] = useState('');
 
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, 'pantry'));
@@ -67,14 +61,14 @@ export default function Home() {
     updateInventory();
   }, []);
 
-  const addItem = async (item, imageUrl = '') => {
+  const addItem = async (item) => {
     const docRef = doc(collection(firestore, 'pantry'), item);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const { quantity } = docSnap.data();
-      await setDoc(docRef, { quantity: quantity + 1, imageUrl }, { merge: true });
+      await setDoc(docRef, { quantity: quantity + 1 }, { merge: true });
     } else {
-      await setDoc(docRef, { quantity: 1, imageUrl });
+      await setDoc(docRef, { quantity: 1 });
     }
     await updateInventory();
   };
@@ -105,41 +99,16 @@ export default function Home() {
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
-  const handleCameraOpen = () => setCameraOpen(true);
-  const handleCameraClose = () => setCameraOpen(false);
-
-  const handleCapture = (webcamRef) => {
-    const imageSrc = webcamRef.current.getScreenshot();
-    setImageSrc(imageSrc);
-    handleCameraClose();
-  };
-
-  const uploadImage = async (imageSrc, itemName) => {
-    const storageRef = ref(storage, `images/${itemName}.jpg`);
-    const response = await fetch(imageSrc);
-    const blob = await response.blob();
-    await uploadBytes(storageRef, blob);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
-  };
 
   const handleAddItem = async () => {
-    if (imageSrc) {
-      const imageUrl = await uploadImage(imageSrc, itemName);
-      await addItem(itemName, imageUrl);
-    } else {
-      await addItem(itemName);
-    }
+    await addItem(itemName);
     setItemName('');
-    setImageSrc('');
     handleClose();
   };
 
   const filteredInventory = inventory.filter(({ name }) =>
     name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const webcamRef = useRef(null);
 
   return (
     <Box
@@ -180,7 +149,7 @@ export default function Home() {
           </Typography>
         </Box>
         <Stack width="800px" spacing={2} overflow="auto" p={2}>
-          {filteredInventory.map(({ name, quantity, imageUrl }) => (
+          {filteredInventory.map(({ name, quantity }) => (
             <Box
               key={name}
               width="100%"
@@ -195,15 +164,6 @@ export default function Home() {
               boxShadow={1}
               gap={2}
             >
-              {imageUrl && (
-                <Image
-                  src={imageUrl}
-                  alt={name}
-                  width={80}
-                  height={80}
-                  style={imgStyle} // Inline borderRadius
-                />
-              )}
               <Box flexGrow={1}>
                 <Typography variant="h6" color="#333">
                   {name.charAt(0).toUpperCase() + name.slice(1)}
@@ -243,44 +203,10 @@ export default function Home() {
               value={itemName}
               onChange={(e) => setItemName(e.target.value)}
             />
-            <Button variant="contained" color="secondary" onClick={handleCameraOpen}>
-              Take Picture
-            </Button>
             <Button variant="contained" color="primary" onClick={handleAddItem}>
               Add
             </Button>
           </Stack>
-          {imageSrc && (
-            <Box mt={2}>
-              <Image
-                src={imageSrc}
-                alt="Captured"
-                width={400}
-                height={300}
-                style={imgStyle} // Inline borderRadius
-              />
-            </Box>
-          )}
-        </Box>
-      </Modal>
-
-      {/* Camera Modal */}
-      <Modal
-        open={cameraOpen}
-        onClose={handleCameraClose}
-        aria-labelledby="camera-modal-title"
-        aria-describedby="camera-modal-description"
-      >
-        <Box sx={modalStyle}>
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            width="100%"
-            height="auto"
-            style={{ borderRadius: '8px', border: '1px solid #ccc' }}
-          />
-          <Button onClick={() => handleCapture(webcamRef)}>Capture</Button>
         </Box>
       </Modal>
     </Box>
